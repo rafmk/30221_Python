@@ -5,19 +5,34 @@ import crc8
 
 
 # Fletcher
+class Fletcher:
+    def __init__(self, data=b'', fl_size=8):
+        self.data = data
+        self.fl_size = fl_size
 
+    def fl_calculate(self):
+        # generate fletcher codeword and append to data
+        return self.data
 
+    def fl_check(self):
+        # check fletcher codeword against data
+        return "bingo"
 
-# Adler-32
+# CRC
 
+class CRC:
+    def __init__(self, data=b'', crc_size=1, poly='0x00'):
+        self.data = data
+        self.crc_size = crc_size
+        self.poly = poly
 
+    def crc_calculate(self):
+        # generate crc codeword and append to data
+        return self.data
 
-# CRC 3 bit (X0, X1, X2)
-def crc8_test(data):
-    print("crc8_test")
-    print(type(bytearray(data)))
-    test = crc8.crc8(initial_string=bytearray(data))
-    return type(test.digest())
+    def crc_check(self):
+        # check crc codeword against data
+        return "bingo"
 
 
 
