@@ -1,37 +1,29 @@
 import numpy as np
 
-
-def flip_bit(value, pos):
-    return value ^ (1 << pos)
-
-
 class DataGenerator:
-    def __init__(self, data_size, error_rate, seed1=None, seed2=None):
-        self.bytes = None
-        self.data_size = data_size
-        self.rng = np.random.default_rng(seed1)
+    def __init__(self, data_size, base, error_rate, seed1=None, seed2=None):
+        self.data_size = data_size # total number of characters
+        self.base = base # character base (nr of bits per character)
+        self.rng1 = np.random.default_rng(seed1) # seed for generating bytes
+        self.error_rate = error_rate # error rate in %
+        self.rng2 = np.random.default_rng(seed2) # seed for generating error positions
+
+        # init variables
+        self.clean = None
+        self.dirty = None
         self.error_positions = None
-        self.error_rate = error_rate
-        self.rng2 = np.random.default_rng(seed2)
 
     def generate_clean(self):
-        self.clean = self.rng.integers(0, 256, size=self.data_size, dtype=np.uint8)
+        self.clean = self.rng1.integers(0, 2 ** self.base, size=self.data_size, dtype=np.uint16) # generate clean data
 
-    def generate_errors(self):
-        self.dirty = self.clean
-        #error_rate in %
-        self.error_positions = self.rng2.integers(0, self.data_size * 8, size=int(self.error_rate / 100 * self.data_size * 8))
-
+    def generate_errors(self, clean_data):
+        self.dirty = clean_data.copy() # copy clean data
+        self.error_positions = self.rng2.integers(0, self.data_size * self.base, size=round(self.error_rate / 100 * self.data_size * self.base)) # generate bit positions of flips
         for error_position in self.error_positions:
-            index, bit = divmod(error_position, 8)
-            if bit == 0:
-                #flip bit 8 of indexed integer
-                flip_bit(self.dirty[index], 7)
-                break
+            index, bit = divmod(error_position, self.base)  # find position within array of bytes
+            self.dirty[index] ^= 1 << bit # flip bit in corresponding index and position
 
-            else:
-                #flip bit of (index + 1) at position (bit - 1)
-                flip_bit(self.dirty[index + 1], bit - 1)
-                break
+
+
 
 
