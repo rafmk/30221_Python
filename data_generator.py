@@ -15,6 +15,7 @@ class DataGenerator:
 
     def generate_clean(self):
         self.clean = self.rng1.integers(0, 2 ** self.base, size=self.data_size, dtype=np.uint16) # generate clean data
+        return self.clean
 
     def generate_errors(self, clean_data):
         self.dirty = clean_data.copy() # copy clean data
