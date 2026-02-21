@@ -1,13 +1,22 @@
 from data_generator import DataGenerator
 from EDAC import *
 import crc
+from FletcherChecksumLib import FletcherChecksumBytes
+from reedsolo import *
 
-dataset = DataGenerator(18, 8, 1)
+dataset = DataGenerator(18, 8, 10)
 clean = dataset.generate_clean()
 
+#Fletcher
+fl_instance = FletcherChecksumBytes
+fl_codeword = fl_instance.get_fletcher16(bytes(clean))
+print(fl_codeword)
 
 
 
+
+
+#CRC
 crc_config = crc.Configuration(
     width=8,
     polynomial=0xA6,
@@ -16,11 +25,10 @@ crc_config = crc.Configuration(
     reverse_input=False,
     reverse_output=False
 )
-
 crc_instance = crc.Calculator(crc_config)
-codeword_clean = crc_instance.checksum(bytes(clean))
-print(clean)
-print(codeword_clean)
-np.append(clean, codeword_clean)
-print(clean)
-#print(crc_instance.verify(bytes(dataset.dirty), ))
+crc_codeword = crc_instance.checksum(bytes(clean))
+
+
+#Reedsolo
+
+
