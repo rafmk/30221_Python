@@ -38,10 +38,10 @@ class Parity:
             parity_byte = self.data[(len(self.data) - nr_parity_bytes) + parity_byte_index]
 
             # data has odd number of 1s and parity is given as 0: bad
-            if bin(byte_val).count('1') % 2 and (parity_byte >> (7 - parity_bit_position)) & 1 == 0:
+            if bin(byte_val).count('1') % 2 and not (parity_byte >> (7 - parity_bit_position)) & 1:
                 self.error_detection +=1
             # data has even number of 1s and parity is given as 1: bad
-            elif bin(byte_val).count('1') % 2 == 0 and (parity_byte >> (7 - parity_bit_position)) & 1:
+            elif not bin(byte_val).count('1') % 2 and (parity_byte >> (7 - parity_bit_position)) & 1:
                 self.error_detection += 1
 
 
