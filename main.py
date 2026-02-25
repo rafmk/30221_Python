@@ -1,5 +1,6 @@
 from data_generator import DataGenerator
 from EDAC import *
+from testing import *
 import crc
 from FletcherChecksumLib import FletcherChecksumBytes
 from reedsolo import *
@@ -9,7 +10,7 @@ from reedsolo import *
 ### Generate data ###
 
 # Setup data generator, set error rate
-DG = DataGenerator(18, 8)
+DG = DataGenerator(18)
 error_rate = 50  # %
 print("@ 50% error rate 50% of bits in the complete message will experience a flip")
 

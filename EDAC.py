@@ -1,5 +1,4 @@
-import numpy as np
-
+### Library for EDAC protocols that I couldn't find already available ###
 
 # UART parity sim
 class Parity:
@@ -44,27 +43,6 @@ class Parity:
             elif not bin(byte_val).count('1') % 2 and (parity_byte >> (7 - parity_bit_position)) & 1:
                 self.error_detection += 1
 
-
-
-
-
-
-
-
-
-# Fletcher
-class Fletcher:
-    def __init__(self, data=b'', fl_size=8):
-        self.data = data
-        self.fl_size = fl_size
-
-    def fl_calculate(self):
-        # generate fletcher codeword and append to data
-        return self.data
-
-    def fl_check(self):
-        # check fletcher codeword against data
-        return "bingo"
 
 # Hamming code (7,4)
 
