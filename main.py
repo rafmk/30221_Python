@@ -1,13 +1,34 @@
-from data_generator import DataGenerator
-from EDAC import *
 from testing import *
-import crc
-from FletcherChecksumLib import FletcherChecksumBytes
-from reedsolo import *
 # just keeping thios for later print(format(byte, '08b'))
 
+rounds = 100
+parity = np.zeros(100)
+crc8 = np.zeros(100)
+fletcher16 = np.zeros(100)
+error_rates = np.arange(0, 100, 1)
+for error_rate in error_rates:
+    sim = Test(rounds)
+    sim.sim_inst(error_rate)
+    parity[error_rate] = sim.det_parity
+    crc8[error_rate] = sim.det_crc8
+    fletcher16[error_rate] = sim.det_fletcher
 
-### Generate data ###
+plt.plot(error_rates, parity, 'o-', linewidth=2, markersize=8, label='parity')
+plt.plot(error_rates, crc8, 's-', linewidth=2, markersize=8, label='crc8')
+plt.plot(error_rates, fletcher16, '^-', linewidth=2, markersize=8, label='fletcher16')
+
+plt.xlabel('Error Rate (%)')
+plt.ylabel(f'Number of Errors Detected after {rounds} rounds')
+plt.title('EDAC Method Performance Across Error Rates')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.xlim(-5, 105)
+plt.ylim(0, 110)
+plt.show()
+
+
+
+'''### Generate data ###
 
 # Setup data generator, set error rate
 DG = DataGenerator(18)
@@ -86,9 +107,7 @@ DG.generate_errors(clean_plus_crc, error_rate)
 
 # Check for errors
 if not CRC.verify(bytes(clean_plus_crc[:-1]), clean_plus_crc[-1]):
-    print("CRC8 error detection: ", "error detected")
+    print("CRC8 error detection: ", "error detected")'''
 
-
-#Reedsolo
 
 

@@ -2,8 +2,9 @@ from matplotlib import pyplot as plt
 import numpy as np
 from data_generator import DataGenerator
 from EDAC import *
-import crc
 from FletcherChecksumLib import FletcherChecksumBytes
+import crc
+from reedsolo import *
 
 
 class Test:
@@ -17,22 +18,33 @@ class Test:
         self.det_rs = 0
         self.det_bhc = 0
 
-        # of corrections for simulation
+        # # of corrections for simulation
         self.cor_hm = 0
         self.cor_rs = 0
         self.cor_bhc = 0
 
 
-    def sim(self, error_rate):
+    def sim_inst(self, error_rate):
 
         for rnd in range(self.rounds):
-            error_seed = rnd # just set seed for error generation identical for all EDAC methods
+            # Just set seed for error generation identical for all EDAC methods
+            error_seed = rnd
+
+            # Setup random data
             DG = DataGenerator(18)
             clean = DG.generate_clean()
 
+            # count up positive detections for each method
             self.det_parity += parity(DG, clean, error_rate, error_seed)
             self.det_fletcher += fletcher(DG, clean, error_rate, error_seed)
             self.det_crc8 += crc8(DG, clean, error_rate, error_seed)
+
+
+
+
+
+
+
 
 
 
