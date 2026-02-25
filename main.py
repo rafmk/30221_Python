@@ -1,17 +1,17 @@
 from testing import *
 # just keeping thios for later print(format(byte, '08b'))
 
-rounds = 100
-parity = np.zeros(100)
-crc8 = np.zeros(100)
-fletcher16 = np.zeros(100)
+rounds = 500
 error_rates = np.arange(0, 100, 1)
+parity = np.zeros(len(error_rates))
+crc8 = np.zeros(len(error_rates))
+fletcher16 = np.zeros(len(error_rates))
 for error_rate in error_rates:
     sim = Test(rounds)
     sim.sim_inst(error_rate)
-    parity[error_rate] = sim.det_parity
-    crc8[error_rate] = sim.det_crc8
-    fletcher16[error_rate] = sim.det_fletcher
+    parity[error_rate] = sim.det_parity / rounds
+    crc8[error_rate] = sim.det_crc8 / rounds
+    fletcher16[error_rate] = sim.det_fletcher / rounds
 
 plt.plot(error_rates, parity, 'o-', linewidth=2, markersize=8, label='parity')
 plt.plot(error_rates, crc8, 's-', linewidth=2, markersize=8, label='crc8')
@@ -22,8 +22,6 @@ plt.ylabel(f'Number of Errors Detected after {rounds} rounds')
 plt.title('EDAC Method Performance Across Error Rates')
 plt.legend()
 plt.grid(True, alpha=0.3)
-plt.xlim(-5, 105)
-plt.ylim(0, 110)
 plt.show()
 
 
