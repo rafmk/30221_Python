@@ -4,7 +4,7 @@ from data_generator import DataGenerator
 from EDAC import *
 from FletcherChecksumLib import FletcherChecksumBytes
 import crc
-from reedsolo import *
+from reedsolo import RSCodec
 
 
 class Test:
@@ -60,7 +60,7 @@ def parity(DG, clean, error_rate, seed):
     # Combine clean + parity bytes & feed to error generator
     clean_plus_p = np.append(clean, parity_bytes)
     # print(clean_plus_p)
-    DG.generate_errors(clean_plus_p, error_rate)
+    DG.generate_errors(clean_plus_p, error_rate, seed)
     # print(DG.dirty)
 
     # Grab dirty array and feed to Parity calc
@@ -87,7 +87,7 @@ def fletcher(DG, clean, error_rate, seed):
     clean_plus_fl = np.append(clean, np.array([fl_h, fl_l], dtype=np.uint8))
 
     # Generate errors
-    DG.generate_errors(clean_plus_fl, error_rate)
+    DG.generate_errors(clean_plus_fl, error_rate, seed)
     # Possibly erroneous fletcher16 values
     fl_h_tx, fl_l_tx = clean_plus_fl[-2:]
 
@@ -121,7 +121,22 @@ def crc8(DG, clean, error_rate, seed):
     clean_plus_crc = np.append(clean, np.uint8(crc_word))
 
     # Generate errors
-    DG.generate_errors(clean_plus_crc, error_rate)
+    DG.generate_errors(clean_plus_crc, error_rate, seed)
 
     # Returns true based on a detected error, crc.verify returns the inverse: false == error hence, the "not"
     return not CRC.verify(bytes(clean_plus_crc[:-1]), clean_plus_crc[-1])
+
+
+def rs(DG, clean, error_rate, seed):
+    rsc = RSCodec(4)
+    print(clean)
+    clean_plus_rs = np.array(rsc.encode(clean))
+    print(clean_plus_rs)
+    DG.generate_errors(clean_plus_rs, error_rate, seed)
+    print(clean_plus_rs)
+    print(np.array(rsc.decode(clean_plus_rs)[0]))
+    return
+
+
+def hamming(DG, clean, error_rate, seed):
+    pass

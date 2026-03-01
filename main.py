@@ -1,7 +1,7 @@
 from testing import *
-# just keeping thios for later print(format(byte, '08b'))
+# just keeping this for later print(format(byte, '08b'))
 
-rounds = 500
+'''rounds = 100
 error_rates = np.arange(0, 100, 1)
 parity = np.zeros(len(error_rates))
 crc8 = np.zeros(len(error_rates))
@@ -22,7 +22,28 @@ plt.ylabel(f'Number of Errors Detected after {rounds} rounds')
 plt.title('EDAC Method Performance Across Error Rates')
 plt.legend()
 plt.grid(True, alpha=0.3)
-plt.show()
+plt.show()'''
+
+#hm = Hamming(list(range(15)), 7)
+hm = Hamming([15], 3)
+hm.encode()
+print([format(i, '08b') for i in list(hm.total_packet)])
+print([format(i, '08b') for i in [0b00111111]])
+print([format(i, '08b') for i in list(hm.decode([0b00111111]))])
+
+hm = Hamming([15], 3)
+hm.encode()
+encoded_packet = list(hm.total_packet)
+print("Encoded:", [format(i, '08b') for i in encoded_packet])
+
+# Introduce a single-bit error at bit index 2 (0-based)
+error_packet = encoded_packet.copy()
+error_packet[0] ^= 0b00000100  # flip bit 2
+print("With Error:", [format(i, '08b') for i in error_packet])
+
+# Decode
+decoded_packet = hm.decode(error_packet)
+print("Decoded:", [format(i, '08b') for i in decoded_packet])
 
 
 
