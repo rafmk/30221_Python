@@ -116,7 +116,7 @@ class Hamming:
         return (data[byte_idx] >> bit_idx) & 1
 
 
-    def calculate_parity(self, input_data):
+    def calc_parity(self, input_data):
 
         # Run through all parity bits and calculate parity
         for parity_position in sorted(self.parity_idx):
@@ -133,31 +133,72 @@ class Hamming:
             # Set parity bit
             self.set_bit(input_data, parity_position, parity_sum % 2)
 
+    def calc_extnd_parity(self, input_data):
+        # Pass over entire packet
+        parity_sum = 0
+        for idx in range(self.total_packet_length):
+            parity_sum += self.get_bit(input_data, idx)
 
-    def encode(self):
-        self.calculate_parity(self.total_packet)
+        # Set last bit as parity bit
+        self.set_bit(input_data, self.total_packet_length, parity_sum % 2)
 
 
+    def encode(self, hamming_type= "trad"):
+        self.calc_parity(self.total_packet)
+        match hamming_type:
 
-    def decode(self, input_data):
+            # Normal Hamming
+            case "trad":
+                return
+
+            # Extended Hamming
+            case "extnd":
+                self.calc_extnd_parity(self.total_packet)
+
+
+    def decode(self, input_data, hamming_type= "trad"):
 
         # Copy input and recalculate parity
         input_data_recalc = input_data[:]
-        self.calculate_parity(input_data_recalc)
-
+        self.calc_parity(input_data_recalc)
 
         error_position = 0
         for parity_position in sorted(self.parity_idx):
 
             # Parity position of rx and recalced differ
             if self.get_bit(input_data_recalc, parity_position) != self.get_bit(input_data, parity_position):
-                # Sum sydrome to find position
+                # Sum syndrome to find position
                 error_position += parity_position + 1
 
-        # Flip bit
-        if error_position !=0:
-            error_bit_value = self.get_bit(input_data, error_position - 1)
-            self.set_bit(input_data, error_position - 1, error_bit_value ^ 1)
+        match hamming_type:
+
+            # Normal Hamming
+            case "trad":
+                # Flip bit
+                if error_position != 0:
+                    print("bit flip detected & corrected")
+                    error_bit_value = self.get_bit(input_data, error_position - 1)
+                    self.set_bit(input_data, error_position - 1, error_bit_value ^ 1)
+
+            # Extended Hamming
+            case "extnd":
+                self.calc_extnd_parity(input_data_recalc)
+
+                if (self.get_bit(input_data_recalc, self.total_packet_length) !=
+                    self.get_bit(input_data, self.total_packet_length)):
+                    if error_position != 0:
+                        print("bit flip detected & corrected")
+                        error_bit_value = self.get_bit(input_data, error_position - 1)
+                        self.set_bit(input_data, error_position - 1, error_bit_value ^ 1)
+                    else:
+                        # Flip extended parity bit...
+                        print("Extended Parity bit error")
+                else:
+                    if error_position != 0:
+                        print("double bit flip detected, cannot correct")
+                    else:
+                        print("no errors")
+
 
         return input_data
 
