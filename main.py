@@ -28,22 +28,10 @@ plt.show()'''
 hm = Hamming([15], 3)
 hm.encode()
 print([format(i, '08b') for i in list(hm.total_packet)])
-print([format(i, '08b') for i in [0b00111111]])
-print([format(i, '08b') for i in list(hm.decode([0b00111111]))])
+error = 0b01111011
+print([format(i, '08b') for i in [error]])
+print([format(i, '08b') for i in list(hm.decode([error]))])
 
-hm = Hamming([15], 3)
-hm.encode()
-encoded_packet = list(hm.total_packet)
-print("Encoded:", [format(i, '08b') for i in encoded_packet])
-
-# Introduce a single-bit error at bit index 2 (0-based)
-error_packet = encoded_packet.copy()
-error_packet[0] ^= 0b00000100  # flip bit 2
-print("With Error:", [format(i, '08b') for i in error_packet])
-
-# Decode
-decoded_packet = hm.decode(error_packet)
-print("Decoded:", [format(i, '08b') for i in decoded_packet])
 
 
 
