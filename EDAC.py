@@ -139,8 +139,8 @@ class Hamming:
         for idx in range(self.total_packet_length):
             parity_sum += self.get_bit(input_data, idx)
 
-        # Set last bit as parity bit
-        self.set_bit(input_data, self.total_packet_length, parity_sum % 2)
+        # Returns 1 for odd nr of ones and 0 for even.
+        return parity_sum % 2
 
 
     def encode(self, hamming_type= "trad"):
@@ -153,7 +153,9 @@ class Hamming:
 
             # Extended Hamming
             case "extnd":
-                self.calc_extnd_parity(self.total_packet)
+                # Set last bit as parity bit
+                self.set_bit(self.total_packet, self.total_packet_length, self.calc_extnd_parity(self.total_packet))
+
 
 
     def decode(self, input_data, hamming_type= "trad"):
@@ -182,10 +184,11 @@ class Hamming:
 
             # Extended Hamming
             case "extnd":
-                self.calc_extnd_parity(input_data_recalc)
+                # Calculates parity bit of received data
+                parity_calc = self.calc_extnd_parity(input_data)
+                parity_rx = self.get_bit(input_data, self.total_packet_length)
 
-                if (self.get_bit(input_data_recalc, self.total_packet_length) !=
-                    self.get_bit(input_data, self.total_packet_length)):
+                if parity_calc != parity_rx:
                     if error_position != 0:
                         print("bit flip detected & corrected")
                         error_bit_value = self.get_bit(input_data, error_position - 1)

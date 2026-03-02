@@ -25,10 +25,10 @@ plt.grid(True, alpha=0.3)
 plt.show()'''
 
 #hm = Hamming(list(range(15)), 7)
-hm = Hamming([15], 3)
+hm = Hamming([0b00000111], 3)
 hm.encode(hamming_type="extnd")
 print([format(i, '08b') for i in list(hm.total_packet)])
-error = 0b11111110
+error = 0b10111111
 print([format(i, '08b') for i in [error]])
 print([format(i, '08b') for i in hm.decode([error], hamming_type="extnd")])
 
