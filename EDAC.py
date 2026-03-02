@@ -71,7 +71,7 @@ class Hamming:
         self.check_pp()
 
         # Length of data in bits
-        input_data_length = len(input_data) * 8
+        self.input_data_length = len(input_data) * 8
 
         # Run through data positions in total packet but stop once length has reached data_length
         input_data_idx = 0
@@ -83,7 +83,7 @@ class Hamming:
 
             # Count up through the original data using the input_data_idx, done at input_data_length - 1
             input_data_idx += 1
-            if input_data_idx >= input_data_length:
+            if input_data_idx >= self.input_data_length:
                 break
 
     def check_pp(self):
@@ -204,6 +204,16 @@ class Hamming:
 
 
         return input_data
+
+    def extract(self, input_data):
+        lst = [0] * (self.input_data_length // 8)
+        lst_bit_idx = 0
+        for total_data_idx in sorted(self.data_idx):
+            bit = self.get_bit(input_data, total_data_idx)
+            self.set_bit(lst, lst_bit_idx, bit)
+            lst_bit_idx += 1
+        return lst
+
 
 
 

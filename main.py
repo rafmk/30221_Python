@@ -24,13 +24,15 @@ plt.legend()
 plt.grid(True, alpha=0.3)
 plt.show()'''
 
-#hm = Hamming(list(range(15)), 7)
-hm = Hamming([0b00000111], 3)
+print(list(range(15)))
+hm = Hamming(list(range(15)), 7)
+#hm = Hamming([0b00001110], 3)
 hm.encode(hamming_type="extnd")
-print([format(i, '08b') for i in list(hm.total_packet)])
-error = 0b10111111
-print([format(i, '08b') for i in [error]])
-print([format(i, '08b') for i in hm.decode([error], hamming_type="extnd")])
+print(" ".join(f"{byte:08b}" for byte in hm.total_packet))
+print(hm.extract(hm.total_packet))
+#error = 0b10111111
+#print([format(i, '08b') for i in [error]])
+#print([format(i, '08b') for i in hm.decode([error], hamming_type="extnd")])
 
 
 
