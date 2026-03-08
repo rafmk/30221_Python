@@ -67,8 +67,7 @@ for i, result in enumerate(results):
 # Customize the first plot
 plt.xlabel('Empty Data Bits', fontsize=12, fontweight='bold')
 plt.ylabel('Overhead (%)', fontsize=12, fontweight='bold')
-#plt.title(f'Extended Hamming Code Efficiency for {data_size}-bit Data',
-              fontsize=14, fontweight='bold')
+#plt.title(f'Extended Hamming Code Efficiency for {data_size}-bit Data', fontsize=14, fontweight='bold')
 plt.grid(True, alpha=0.3, linestyle='--')
 plt.legend(loc='upper right', fontsize=9, framealpha=0.9)
 
