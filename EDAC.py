@@ -1,6 +1,9 @@
 ### Library for EDAC protocols that I couldn't find already available ###
+import copy
 import numpy as np
 from math import ceil
+from functools import reduce
+import operator as op
 
 from contourpy.util import data
 
@@ -65,11 +68,11 @@ class Hamming:
         self.blocks = ceil(self.input_len_bits / self.len_available_bits)
 
         # block-wise position of parity bits
-        self.parity_idx = np.array([2 ** i - 1 for i in range(self.r)])
+        self.parity_idx = np.array([2 ** i for i in range(self.r)])
         self.block_size = 2 ** self.r
 
-        # add index for extended parity bit at the end of the block
-        self.parity_idx = np.append(self.parity_idx, self.block_size - 1)
+        # add index for extended parity bit at the start of the block
+        self.parity_idx = np.append(self.parity_idx, 0)
 
         # block-wise position of data bits
         self.data_idx = np.delete(np.arange(self.block_size), self.parity_idx)
@@ -82,7 +85,9 @@ class Hamming:
         self.message = np.zeros(self.block_size * self.blocks, dtype=bool)
 
         # calculate lookup matrix
-        self.calculation_matrix = self.pre_calc_matrix()
+        #self.calculation_matrix = self.pre_calc_matrix()
+
+        self.check_pp()
 
 
 
@@ -99,23 +104,40 @@ class Hamming:
         # calculate Hamming parity bits
         self.calc_parity(self.message)
 
-    def pre_calc_matrix(self):
-        # init dict
-        matrix = {}
-        for parity_bit_idx in self.parity_idx[:-1]:
-            # initialize sub list
-            parity_check_lst = []
-            # run through data bit indices
-            for data_bit_idx in self.data_idx:
+    def decode(self, message):
 
-                if (data_bit_idx + 1) & (parity_bit_idx + 1):
-                    # only append data bit indices that match in their base 1 value
-                    # (this is important for binary interpretation)
-                    parity_check_lst.append(data_bit_idx)
+        # Copy input and recalculate parity
+        message_cpy = copy.deepcopy(message)
+        #self.calc_parity(message_cpy)
+        for block in range(self.blocks):
+            block_start = block * self.block_size
+            block_end = block_start + self.block_size
 
-            matrix[parity_bit_idx] = np.array(parity_check_lst)
-        # returns dict which directs towards which data bit indices to use in order to calculate parities
-        return matrix
+            error_position = reduce(op.xor, [i for i, bit in enumerate(message[block_start:block_end]) if bit])
+
+            # extended parity bit calculation is o.k. (zero)
+            if not message[block_start: block_end].sum() % 2:
+                # block is fully zero
+                if message[block_start:block_end].sum() != 0:
+                    # no errors
+                    pass
+                # block is not fully zero
+                elif error_position != 0:
+                    # doulbe bit flip, cannot correct
+                    pass
+                else:
+                    pass
+            # parity calculation is off (single or double error)
+            else:
+
+                # single bit error found
+                if error_position != 0:
+                    message[block_start + error_position] = not message[block_start + error_position]
+
+                # error within the extended parity bit
+                else:
+                    pass
+
 
 
     def calc_parity(self, message):
@@ -123,11 +145,17 @@ class Hamming:
         for block in range(self.blocks):
             block_start = block * self.block_size
             block_end = block_start + self.block_size
-            for parity_bit_idx, parity_check_lst in self.calculation_matrix.items():
-                message[parity_bit_idx + block_start] = message[parity_check_lst + block_start].sum() % 2
+
+            if message[block_start:block_end].sum() != 0:
+
+                error_position = reduce(op.xor, [i for i, bit in enumerate(message[block_start:block_end]) if bit])
+                for i in range(error_position.bit_length()):
+                    if error_position >> i & 1:
+                        # flip parity bit in message
+                        message[block_start + (2 ** i)] = not message[block_start + (2 ** i)]
 
             # calculated extended parity
-            message[self.parity_idx[-1] + block_start] = message[block_start: block_end].sum() % 2
+            message[block_start] = message[block_start: block_end].sum() % 2
 
 
     def check_pp(self):
@@ -144,6 +172,8 @@ class Hamming:
                 sanity_check += 'X'
 
         print(sanity_check)
+
+
 
 
 

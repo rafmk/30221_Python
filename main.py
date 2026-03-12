@@ -26,7 +26,7 @@ plt.show()'''
 
 
 input_data = np.array([1, 15], dtype=np.uint8)
-hm = Hamming(input_data, 3)
+hm = Hamming(input_data, 4)
 hm.encode()
 print(hm.message)
 #hm = Hamming([0b00001110], 3)
