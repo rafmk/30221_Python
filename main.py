@@ -7,7 +7,7 @@ parity = np.zeros(len(error_rates))
 crc8 = np.zeros(len(error_rates))
 fletcher16 = np.zeros(len(error_rates))
 for error_rate in error_rates:
-    sim = Test(rounds)
+    sim = Test(rounds, 'bits')
     sim.sim_inst(error_rate)
     parity[error_rate] = sim.det_parity / rounds
     crc8[error_rate] = sim.det_crc8 / rounds
@@ -24,8 +24,11 @@ plt.legend()
 plt.grid(True, alpha=0.3)
 plt.show()'''
 
-#print(list(range(15)))
-#hm = Hamming(list(range(15)), 7)
+
+input_data = np.array([1, 15], dtype=np.uint8)
+hm = Hamming(input_data, 3)
+hm.encode()
+print(hm.message)
 #hm = Hamming([0b00001110], 3)
 #hm.encode(hamming_type="extnd")
 #print(" ".join(f"{byte:08b}" for byte in hm.total_packet))

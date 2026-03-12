@@ -1,4 +1,9 @@
 ### Library for EDAC protocols that I couldn't find already available ###
+import numpy as np
+from math import ceil
+
+from contourpy.util import data
+
 
 # UART parity sim
 class Parity:
@@ -48,14 +53,109 @@ class Parity:
                 self.error_detection += 1
 
 
-# Hamming code (7,4)
-
-
-
+# Hamming code
 
 class Hamming:
+    def __init__(self, input_data, r):
+        # input_data must be np array of dtype uint8
+        self.input_data = np.unpackbits(input_data, bitorder="little")  # array of bits
+        self.input_len_bits = len(self.input_data)
+        self.r = r  # int >= 3
+        self.len_available_bits = 2 ** self.r - 1 - self.r
+        self.blocks = ceil(self.input_len_bits / self.len_available_bits)
+
+        # block-wise position of parity bits
+        self.parity_idx = np.array([2 ** i - 1 for i in range(self.r)])
+        self.block_size = 2 ** self.r
+
+        # add index for extended parity bit at the end of the block
+        self.parity_idx = np.append(self.parity_idx, self.block_size - 1)
+
+        # block-wise position of data bits
+        self.data_idx = np.delete(np.arange(self.block_size), self.parity_idx)
+
+        # global position of data bits
+        self.global_data_idx = np.concatenate([block * self.block_size + self.data_idx
+                                                 for block in range(self.blocks)])
+
+        # initialize message
+        self.message = np.zeros(self.block_size * self.blocks, dtype=bool)
+
+        # calculate lookup matrix
+        self.calculation_matrix = self.pre_calc_matrix()
 
 
+
+    def encode(self):
+
+        # position input data bits within message
+        for i, position in enumerate(self.global_data_idx):
+            # break out of loop if we reach end of input data
+            if i == self.input_len_bits:
+                break
+            self.message[position] = self.input_data[i]
+
+
+        # calculate Hamming parity bits
+        self.calc_parity(self.message)
+
+    def pre_calc_matrix(self):
+        # init dict
+        matrix = {}
+        for parity_bit_idx in self.parity_idx[:-1]:
+            # initialize sub list
+            parity_check_lst = []
+            # run through data bit indices
+            for data_bit_idx in self.data_idx:
+
+                if (data_bit_idx + 1) & (parity_bit_idx + 1):
+                    # only append data bit indices that match in their base 1 value
+                    # (this is important for binary interpretation)
+                    parity_check_lst.append(data_bit_idx)
+
+            matrix[parity_bit_idx] = np.array(parity_check_lst)
+        # returns dict which directs towards which data bit indices to use in order to calculate parities
+        return matrix
+
+
+    def calc_parity(self, message):
+        # calculate Hamming parity bits
+        for block in range(self.blocks):
+            block_start = block * self.block_size
+            block_end = block_start + self.block_size
+            for parity_bit_idx, parity_check_lst in self.calculation_matrix.items():
+                message[parity_bit_idx + block_start] = message[parity_check_lst + block_start].sum() % 2
+
+            # calculated extended parity
+            message[self.parity_idx[-1] + block_start] = message[block_start: block_end].sum() % 2
+
+
+    def check_pp(self):
+
+        sanity_check = ''
+        for i, val in enumerate(self.message):
+            if i not in self.global_data_idx:
+                sanity_check += 'P'
+
+            elif i in self.global_data_idx:
+                sanity_check += 'D'
+
+            else:
+                sanity_check += 'X'
+
+        print(sanity_check)
+
+
+
+
+
+
+
+
+
+
+# bad V1 version, a few oversights, now I'm redoing it i guess
+class Hamming_bad:
     def __init__(self, input_data, r):
         # Determine size of total packet in bits
         self.total_packet_length = 2 ** r - 1
