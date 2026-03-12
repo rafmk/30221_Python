@@ -5,55 +5,45 @@ from math import ceil
 from functools import reduce
 import operator as op
 
-from contourpy.util import data
-
-
 # UART parity sim
 class Parity:
-
-
-    def __init__(self, data=b''):
-        self.data = data
-        self.error_detection = 0
+    def __init__(self, input_data):
+        self.blocks = len(input_data)
+        self.input_data = np.unpackbits(input_data, bitorder="little")
+        self.block_size = 9 # byte + one parity bit
+        # block-wise data bit positions
+        self.data_idx = np.arange(1, self.block_size)
+        self.message = np.zeros(self.block_size * self.blocks, dtype=bool)
+        # global position of data bits
+        self.global_data_idx = np.concatenate([block * self.block_size + self.data_idx for block in range(self.blocks)])
+        self.errors = 0
 
 
     def parity_calc(self):
-        # Calculate number of parity bytes needed (one parity byte per 8 data bytes, rounding up)
-        num_parity_bytes = (len(self.data) + 7) // 8
+        # position input data bits within message
+        for i, position in enumerate(self.global_data_idx):
+            self.message[position] = self.input_data[i]
 
-        # Initialize parity bytes
-        parity_bytes = bytearray(num_parity_bytes)
+        for block in range(self.blocks):
+            block_start = block * self.block_size
+            block_end = block_start + self.block_size
 
-        for byte_idx, byte_val in enumerate(self.data):
-
-            # Determine which parity byte this data byte belongs to
-            parity_byte_index, parity_bit_position = divmod(byte_idx, 8)
-
-            # Count number of 1 bits in the byte
-            bit_count = bin(byte_val).count('1')
-
-            # Add 1 if bit_count odd
-            if bit_count % 2:
-                # start parity bits with MSB
-                parity_bytes[parity_byte_index] |= (1 << (7 - parity_bit_position))
-
-        return parity_bytes
+            # block is odd
+            if self.message[block_start: block_end].sum() % 2:
+                # now block is even
+                self.message[block_start] = True
 
 
-    def check_parity(self, nr_parity_bytes):
+    def check_parity(self, message):
+        for block in range(self.blocks):
+            block_start = block * self.block_size
+            block_end = block_start + self.block_size
 
-        for byte_idx, byte_val in enumerate(self.data[:(len(self.data) - nr_parity_bytes)]):
+            # block is odd meaning error has been detected
+            if message[block_start: block_end].sum() % 2:
+                self.errors += 1
 
-            # Determine which parity byte this data byte belongs to
-            parity_byte_index, parity_bit_position = divmod(byte_idx, 8)
-            parity_byte = self.data[(len(self.data) - nr_parity_bytes) + parity_byte_index]
-
-            # data has odd number of 1s and parity is given as 0: bad
-            if bin(byte_val).count('1') % 2 and not (parity_byte >> (7 - parity_bit_position)) & 1:
-                self.error_detection +=1
-            # data has even number of 1s and parity is given as 1: bad
-            elif not bin(byte_val).count('1') % 2 and (parity_byte >> (7 - parity_bit_position)) & 1:
-                self.error_detection += 1
+        return self.errors
 
 
 # Hamming code
@@ -78,16 +68,12 @@ class Hamming:
         self.data_idx = np.delete(np.arange(self.block_size), self.parity_idx)
 
         # global position of data bits
-        self.global_data_idx = np.concatenate([block * self.block_size + self.data_idx
-                                                 for block in range(self.blocks)])
+        self.global_data_idx = np.concatenate([block * self.block_size + self.data_idx for block in range(self.blocks)])
 
         # initialize message
         self.message = np.zeros(self.block_size * self.blocks, dtype=bool)
 
-        # calculate lookup matrix
-        #self.calculation_matrix = self.pre_calc_matrix()
-
-        self.check_pp()
+        #self.check_pp()
 
 
 
@@ -100,45 +86,42 @@ class Hamming:
                 break
             self.message[position] = self.input_data[i]
 
-
         # calculate Hamming parity bits
         self.calc_parity(self.message)
 
     def decode(self, message):
+        error_count = 0
 
-        # Copy input and recalculate parity
-        message_cpy = copy.deepcopy(message)
-        #self.calc_parity(message_cpy)
         for block in range(self.blocks):
             block_start = block * self.block_size
             block_end = block_start + self.block_size
+            error_position = reduce(op.xor, [i for i, bit in enumerate(message[block_start:block_end]) if bit], 0)
 
-            error_position = reduce(op.xor, [i for i, bit in enumerate(message[block_start:block_end]) if bit])
-
-            # extended parity bit calculation is o.k. (zero)
-            if not message[block_start: block_end].sum() % 2:
-                # block is fully zero
-                if message[block_start:block_end].sum() != 0:
-                    # no errors
-                    pass
-                # block is not fully zero
-                elif error_position != 0:
-                    # doulbe bit flip, cannot correct
-                    pass
-                else:
-                    pass
-            # parity calculation is off (single or double error)
-            else:
-
-                # single bit error found
+            # if extended parity returns odd (sum % 2 == true) an odd number of errors have occurred
+            if message[block_start: block_end].sum() % 2:
+                # if error_position != 0 than single bit flip has occurred
                 if error_position != 0:
+                    # fix error
                     message[block_start + error_position] = not message[block_start + error_position]
+                    error_count += 1
 
-                # error within the extended parity bit
+                # error in parity bit
+                else:
+                    message[block_start] = not message[block_start]
+                    error_count += 1
+
+            # if extended parity check ok, even number of errors detected
+            else:
+                # double bit error
+                if error_position != 0:
+                    # cannot fix error
+                    error_count += 2
+
+                # no error
                 else:
                     pass
 
-
+        return error_count
 
     def calc_parity(self, message):
         # calculate Hamming parity bits
@@ -146,13 +129,11 @@ class Hamming:
             block_start = block * self.block_size
             block_end = block_start + self.block_size
 
-            if message[block_start:block_end].sum() != 0:
-
-                error_position = reduce(op.xor, [i for i, bit in enumerate(message[block_start:block_end]) if bit])
-                for i in range(error_position.bit_length()):
-                    if error_position >> i & 1:
-                        # flip parity bit in message
-                        message[block_start + (2 ** i)] = not message[block_start + (2 ** i)]
+            error_position = reduce(op.xor, [i for i, bit in enumerate(message[block_start:block_end]) if bit], 0)
+            for i in range(error_position.bit_length()):
+                if error_position >> i & 1:
+                    # flip parity bit in message
+                    message[block_start + (2 ** i)] = not message[block_start + (2 ** i)]
 
             # calculated extended parity
             message[block_start] = message[block_start: block_end].sum() % 2
@@ -173,7 +154,9 @@ class Hamming:
 
         print(sanity_check)
 
-
+    def convert(self, message):
+        data_bits = message[self.global_data_idx]
+        return np.packbits(data_bits, bitorder="little")
 
 
 
@@ -185,7 +168,7 @@ class Hamming:
 
 
 # bad V1 version, a few oversights, now I'm redoing it i guess
-class Hamming_bad:
+'''class Hamming_bad:
     def __init__(self, input_data, r):
         # Determine size of total packet in bits
         self.total_packet_length = 2 ** r - 1
@@ -342,7 +325,7 @@ class Hamming_bad:
             bit = self.get_bit(input_data, total_data_idx)
             self.set_bit(lst, lst_bit_idx, bit)
             lst_bit_idx += 1
-        return lst
+        return lst'''
 
 
 

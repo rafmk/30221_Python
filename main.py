@@ -25,10 +25,12 @@ plt.grid(True, alpha=0.3)
 plt.show()'''
 
 
-input_data = np.array([1, 15], dtype=np.uint8)
-hm = Hamming(input_data, 4)
+input_data = np.arange(18, dtype=np.uint8)
+print(input_data)
+hm = Hamming(input_data, 5)
 hm.encode()
-print(hm.message)
+hm.decode(hm.message)
+print(hm.convert(hm.message))
 #hm = Hamming([0b00001110], 3)
 #hm.encode(hamming_type="extnd")
 #print(" ".join(f"{byte:08b}" for byte in hm.total_packet))
