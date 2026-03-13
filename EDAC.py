@@ -46,6 +46,7 @@ class Parity:
         return self.errors
 
 
+
 # Hamming code
 
 class Hamming:

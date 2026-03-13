@@ -21,10 +21,9 @@ class Test:
         # # of corrections for simulation
         self.cor_hm = 0
         self.cor_rs = 0
-        self.cor_bhc = 0
 
 
-    def sim_inst(self, error_rate):
+    def sim(self, error_rate):
 
         for rnd in range(self.rounds):
             # Just set seed for error generation identical for all EDAC methods
@@ -40,68 +39,51 @@ class Test:
             self.det_crc8 += crc8(DG, clean, self.error_rate_type, error_rate, error_seed)
 
 
-
-
-
-
-
-
-
-
-
-
-
 def parity(DG, clean, error_rate_type, error_rate, seed):
-    ###UART Parity clone###
 
-    # Grab parity bytes
-    parity_bytes = np.array(Parity(clean).parity_calc(), dtype=np.uint8)
+    # Instance of parity class
+    UART_parity = Parity(clean)
+    # calculate parities and modify message
+    UART_parity.parity_calc()
+    # generate errors within message, returns message with bit flips
+    DG.generate_errors(UART_parity.message, error_rate_type, error_rate, seed)
 
-    # Combine clean + parity bytes & feed to error generator
-    clean_plus_p = np.append(clean, parity_bytes)
-    # print(clean_plus_p)
-    DG.generate_errors(clean_plus_p, error_rate_type, error_rate, seed)
-    # print(DG.dirty)
+    detected_errors = UART_parity.check_parity(UART_parity.message)
 
-    # Grab dirty array and feed to Parity calc
-    PD = Parity(clean_plus_p)
-    PD.check_parity(len(parity_bytes))
-    #print("Parity error detection: ", PD.error_detection, "errors detected")
-
-    # Returns true based on a detected error
-    return PD.error_detection !=0 #, PD.error_detection
+    # Returns nr of blocks with errors detected in it
+    return detected_errors
 
 
 def fletcher(DG, clean, error_rate_type, error_rate, seed):
-    ###Fletcher###
 
-    # Setup instance
-    FL = FletcherChecksumBytes
+    # Instance of fletcher class
+    fletcher16 = FletcherChecksumBytes
 
     # Calculate fletcher 16 for clean data
-    fl_clean = FL.get_fletcher16(bytes(clean))
+    fl_clean = fletcher16.get_fletcher16(bytes(clean))
     fl_h = (fl_clean['Fletcher16_dec'] >> 8) & 0xff
     fl_l = fl_clean['Fletcher16_dec'] & 0xff
 
-    # Combine clean + parity bytes & feed to error generator
-    clean_plus_fl = np.append(clean, np.array([fl_h, fl_l], dtype=np.uint8))
+    # Combine fletcher16 codeword with bytes, then convert to bits
+    message_bytes = np.append(np.array([fl_l, fl_h], dtype=np.uint8), clean)
+    message_bits = np.unpackbits(message_bytes, bitorder="little")
 
-    # Generate errors
-    DG.generate_errors(clean_plus_fl, error_rate_type, error_rate, seed)
+    # Generate errors & convert back to bytes
+    DG.generate_errors(message_bits, error_rate_type, error_rate, seed)
+    message_bytes = np.packbits(message_bits, bitorder="little")
     # Possibly erroneous fletcher16 values
-    fl_h_tx, fl_l_tx = clean_plus_fl[-2:]
+    fletcher_tx_l, fletcher_tx_h = message_bytes[:2]
 
-    # Calculate fletcher16 values for incoming data and check against sent values
-    fl_dirty = FL.get_fletcher16(bytes(clean_plus_fl[:-2]))
-    fl_h_rx = (fl_dirty['Fletcher16_dec'] >> 8) & 0xff
-    fl_l_rx = fl_dirty['Fletcher16_dec'] & 0xff
+    # Re-calculate fletcher16 value for received data
+    fletcher_rx = fletcher16.get_fletcher16(bytes(message_bytes[2:]))
+    fletcher_rx_h = (fletcher_rx['Fletcher16_dec'] >> 8) & 0xff
+    fletcher_rx_l = fletcher_rx['Fletcher16_dec'] & 0xff
 
-    # Returns true based on a detected error
-    return fl_h_tx != fl_h_rx or fl_l_tx != fl_l_rx
+    # Returns true (1) based on a detected error
+    return fletcher_rx_h != fletcher_tx_h or fletcher_tx_l != fletcher_rx_l
 
 
 def crc8(DG, clean, error_rate_type, error_rate, seed):
-    ###CRC8###
 
     # Setup instance with desired settings
     crc_config = crc.Configuration(
@@ -112,19 +94,21 @@ def crc8(DG, clean, error_rate_type, error_rate, seed):
         reverse_input=False,
         reverse_output=False
     )
-    CRC = crc.Calculator(crc_config)
+    crc8_instance = crc.Calculator(crc_config)
 
-    # Calculate crc value
-    crc_word = CRC.checksum(bytes(clean))
+    # Calculate crc8 word from bytes
+    crc_word = crc8_instance.checksum(bytes(clean))
 
-    # Combine clean + crc word & feed to error generator
-    clean_plus_crc = np.append(clean, np.uint8(crc_word))
+    # Combine crc word + bytes and convert to bits
+    message_bytes = np.append(np.uint8(crc_word), clean)
+    message_bits = np.unpackbits(message_bytes, bitorder="little")
 
-    # Generate errors
-    DG.generate_errors(clean_plus_crc, error_rate_type, error_rate, seed)
+    # Generate errors and convert back to bytes
+    DG.generate_errors(message_bits, error_rate_type, error_rate, seed)
+    message_bytes = np.packbits(message_bits, bitorder="little")
 
     # Returns true based on a detected error, crc.verify returns the inverse: false == error hence, the "not"
-    return not CRC.verify(bytes(clean_plus_crc[:-1]), clean_plus_crc[-1])
+    return not crc8_instance.verify(bytes(message_bytes[1:]), message_bytes[0])
 
 
 def rs(DG, clean, error_rate_type, error_rate, seed):
@@ -138,13 +122,16 @@ def rs(DG, clean, error_rate_type, error_rate, seed):
     return
 
 
-def hamming(DG, clean, error_rate_type, error_rate, seed):
-    # encode clean data & return here
+def hamming(r, DG, clean, error_rate_type, error_rate, seed):
 
-    # feed encoded data through error generator
+    # instance of hamming with specific nr of parity bits
+    ham_r = Hamming(clean, r)
 
-    # decode erroneous data, return true if error detected
+    # calculate hamming parities for entire block
+    ham_r.encode()
 
+    # generate errors in message
+    DG.generate_errors(ham_r.message, error_rate_type, error_rate, seed)
 
-
-    return
+    # return number of errors in message
+    return ham_r.decode(ham_r.message)
