@@ -2,7 +2,7 @@
 import matplotlib.pyplot as plt
 from EDAC import *
 from data_generator import DataGenerator
-from testing import parity, fletcher, crc8, rs, hamming
+from testing import parity, fletcher, crc8, crc16, rs, hamming, checksum
 from tqdm import tqdm
 
 
@@ -25,6 +25,7 @@ class Test:
         # Detection counters
         self.det_parity = 0
         self.det_fletcher = 0
+        self.det_checksum8 = 0
         self.det_crc8 = 0
         self.det_crc16 = 0
         self.det_hm_32_26 = 0
@@ -47,8 +48,10 @@ class Test:
 
         results = {
             'parity': {'detection': [], 'correction': []},
+            'checksum8': {'detection': [], 'correction': []},
             'fletcher16': {'detection': [], 'correction': []},
             'crc8': {'detection': [], 'correction': []},
+            'crc16': {'detection': [], 'correction': []},
             'hamming_32_26': {'detection': [], 'correction': []},
         }
 
@@ -60,6 +63,8 @@ class Test:
             results['parity']['detection'].append(self.det_parity)
 
             # checksum8
+            self.det_checksum8 = checksum(self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd)
+            results['checksum8']['detection'].append(int(self.det_checksum8))
 
             # fletcher16
             self.det_fletcher = fletcher(self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd)
@@ -71,6 +76,9 @@ class Test:
             results['crc8']['detection'].append(int(self.det_crc8))
 
             # crc16
+            self.det_crc16 = (
+                crc16(0xAC9A, self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd))
+            results['crc16']['detection'].append(int(self.det_crc16))
 
             # hamming (32,26)
             self.det_hm_32_26, self.cor_hm_32_26 = (
@@ -112,48 +120,86 @@ class Test:
 
         return results
 
+
+
+
 # Test parameters
 nr_of_bytes = 18  # Bytes per round
-rounds = 1000  # Number of rounds per error rate
+rounds = 100  # Number of rounds per error rate
 error_rate_type = 'bits'  # Type of errors
 
 # Error rates to test
-error_rates = [10, 20, 30]
+error_rates = np.arange(1, 21, 1)
 
 # Create test instance
 tester = Test(nr_of_bytes, rounds, error_rate_type)
 simulation_results = tester.run_simulation(error_rates)
 
-methods = list(next(iter(simulation_results.values())).keys())
-error_rates = list(simulation_results.keys())
 
-x = np.arange(len(error_rates))
-width = 0.18
+def plot_ordered_simulation_results(simulation_results):
+    # 1. Prepare base lists
+    error_rates = sorted(list(simulation_results.keys()))
+    # Access the first available error rate to get method keys
+    all_methods = list(simulation_results[error_rates[0]].keys())
 
-plt.figure(figsize=(12,6))
+    # 2. Calculate the "Global Average" for sorting
+    method_scores = {}
+    for method in all_methods:
+        avg_across_rates = np.mean([simulation_results[er][method][0] for er in error_rates])
+        method_scores[method] = avg_across_rates
 
-for i, method in enumerate(methods):
+    # 3. Sort methods by their global average (ascending)
+    sorted_methods = sorted(all_methods, key=lambda m: method_scores[m])
 
-    avg = [simulation_results[er][method][0] for er in error_rates]
-    minv = [simulation_results[er][method][1] for er in error_rates]
-    maxv = [simulation_results[er][method][2] for er in error_rates]
+    # 4. Setup Plotting with a soft color palette
+    fig, ax = plt.subplots(figsize=(12, 7))
+    # Using 'Pastel1' or 'Set3' for professional, soft colors
+    colors = plt.cm.viridis(np.linspace(0.3, 1, len(sorted_methods)))
 
-    pos = x + i * width
+    x = np.arange(len(error_rates))
+    total_width = 0.8
+    bar_width = total_width / len(sorted_methods)
 
-    plt.bar(pos, avg, width, label=method)
-    plt.scatter(pos, minv, color="black", marker="_", s=200)
-    plt.scatter(pos, maxv, color="black", marker="_", s=200)
+    for i, method in enumerate(sorted_methods):
+        avgs = [simulation_results[er][method][0] for er in error_rates]
+        mins = [simulation_results[er][method][1] for er in error_rates]
+        maxs = [simulation_results[er][method][2] for er in error_rates]
 
-plt.xticks(x + width*(len(methods)-1)/2, error_rates)
-plt.xlabel("Error Rate")
-plt.ylabel("Detected Errors (bits)")
-plt.title("EDAC Detection Performance")
+        # Calculate error bar heights
+        yerr = [
+            [a - m for a, m in zip(avgs, mins)],
+            [M - a for a, M in zip(avgs, maxs)]
+        ]
 
-plt.legend()
-plt.grid(axis="y", linestyle="--", alpha=0.6)
+        offset = (i - (len(sorted_methods) - 1) / 2) * bar_width
 
-plt.tight_layout()
-plt.show()
+        # Plot bars with softer edge colors and the chosen palette
+        ax.bar(x + offset, avgs, bar_width, label=method,
+               yerr=yerr, capsize=4, color=colors[i], edgecolor='gray', linewidth=0.5)
+
+    # 5. Finalize Chart Labels
+    ax.set_xlabel(f'Error Rate ({error_rate_type})')
+    ax.set_ylabel('Detections \n (for checksums 1 indicates a detection across the entire message)')
+    ax.set_title(f'EDAC Method Performance for Data Packet size of {nr_of_bytes} bytes')
+    ax.set_xticks(x)
+    ax.set_xticklabels(error_rates)
+
+    # 6. Indication of error bar meaning
+    # Placing a text box in the upper right
+    explanation_text = "Error bars represent\nMinimum and Maximum\ndetections per round."
+    ax.text(0.02, 0.75, explanation_text, transform=ax.transAxes,
+            verticalalignment='top', horizontalalignment='left',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.5, edgecolor='gray'))
+
+    ax.legend(title="Methods (Sorted by Avg)", loc='upper left')
+    plt.grid(axis='y', linestyle='--', alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# Run the plot
+plot_ordered_simulation_results(simulation_results)
 
 
 

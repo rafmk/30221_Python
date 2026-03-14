@@ -51,7 +51,7 @@ data_size = 144
 results = find_best_code_for_data(data_size)
 
 # Color map for different r values
-colors = plt.cm.viridis(np.linspace(0, 1, len(results)))
+colors = plt.cm.viridis(np.linspace(0.3, 1, len(results)))
 
 # Plot 1: Overhead vs Empty Bits (main plot)
 for i, result in enumerate(results):

@@ -45,10 +45,29 @@ class Parity:
 
         return self.errors
 
+# Basic checksum (max data size 255 bits)
+class Checksum:
+    def __init__(self, input_data):
+        self.blocks = len(input_data)
+        self.message = np.unpackbits(input_data, bitorder="little")
+        self.message = np.append(np.zeros(8, dtype=np.uint8), self.message)
+
+
+    def calc_checksum(self, message):
+        # save old checksum
+        old_chksm = np.packbits(message[:8], bitorder="little")
+        # calc checksum while avoiding checksum bits themselves
+        chksm = np.sum(message[8:])
+        # assign new checksum to message start
+        message[:8] = np.unpackbits(np.array([chksm], dtype=np.uint8), bitorder="little")
+
+        # returns True if mismatched (error detected)
+        return old_chksm != chksm
+
+
 
 
 # Hamming code
-
 class Hamming:
     def __init__(self, input_data, r):
         # input_data must be np array of dtype uint8
@@ -163,173 +182,6 @@ class Hamming:
         return np.packbits(data_bits, bitorder="little")
 
 
-
-
-
-
-
-
-
-
-# bad V1 version, a few oversights, now I'm redoing it i guess
-'''class Hamming_bad:
-    def __init__(self, input_data, r):
-        # Determine size of total packet in bits
-        self.total_packet_length = 2 ** r - 1
-
-        # Determine ceiling size of total packet in bytes and create corresponding byte array of zero
-        nr_of_bytes = (self.total_packet_length + 7) // 8
-        self.total_packet = bytearray(nr_of_bytes)
-
-
-        # Locate bit position of all parity bits and data bits
-        self.parity_idx = {2 ** i - 1 for i in range(r)}
-        self.data_idx = set(range(self.total_packet_length)) - self.parity_idx
-        self.check_pp()
-
-        # Length of data in bits
-        self.input_data_length = len(input_data) * 8
-
-        # Run through data positions in total packet but stop once length has reached data_length
-        input_data_idx = 0
-        for total_data_idx in sorted(self.data_idx):
-
-            # Finds bit value within original data array, if 1 set self.bits position to 1
-            if self.get_bit(input_data, input_data_idx):
-                self.set_bit(self.total_packet, total_data_idx, 1)
-
-            # Count up through the original data using the input_data_idx, done at input_data_length - 1
-            input_data_idx += 1
-            if input_data_idx >= self.input_data_length:
-                break
-
-    def check_pp(self):
-
-        sanity_check = ''
-        for idx in range(self.total_packet_length):
-            if idx in self.parity_idx:
-                sanity_check += 'P'
-
-            elif idx in self.data_idx:
-                sanity_check += 'D'
-
-            else:
-                sanity_check += 'X'
-
-        print(sanity_check)
-
-
-
-    def set_bit(self, data, position, value):
-        byte_idx, bit_idx = divmod(position, 8)
-        if value:
-            data[byte_idx] |= (1 << bit_idx)
-        else:
-            data[byte_idx] &= ~(1 << bit_idx)
-
-
-    def get_bit(self, data, position):
-        byte_idx, bit_idx = divmod(position, 8)
-        return (data[byte_idx] >> bit_idx) & 1
-
-
-    def calc_parity(self, input_data):
-
-        # Run through all parity bits and calculate parity
-        for parity_position in sorted(self.parity_idx):
-            parity_sum = 0
-
-            # Run through all data positions
-            for data_bit_idx in sorted(self.data_idx):
-
-                # Find positions where binary index match parity_position
-
-                if (data_bit_idx + 1) & (parity_position + 1):
-                    parity_sum += self.get_bit(input_data, data_bit_idx)
-
-            # Set parity bit
-            self.set_bit(input_data, parity_position, parity_sum % 2)
-
-    def calc_extnd_parity(self, input_data):
-        # Pass over entire packet
-        parity_sum = 0
-        for idx in range(self.total_packet_length):
-            parity_sum += self.get_bit(input_data, idx)
-
-        # Returns 1 for odd nr of ones and 0 for even.
-        return parity_sum % 2
-
-
-    def encode(self, hamming_type= "trad"):
-        self.calc_parity(self.total_packet)
-        match hamming_type:
-
-            # Normal Hamming
-            case "trad":
-                return
-
-            # Extended Hamming
-            case "extnd":
-                # Set last bit as parity bit
-                self.set_bit(self.total_packet, self.total_packet_length, self.calc_extnd_parity(self.total_packet))
-
-
-
-    def decode(self, input_data, hamming_type= "trad"):
-
-        # Copy input and recalculate parity
-        input_data_recalc = input_data[:]
-        self.calc_parity(input_data_recalc)
-
-        error_position = 0
-        for parity_position in sorted(self.parity_idx):
-
-            # Parity position of rx and recalced differ
-            if self.get_bit(input_data_recalc, parity_position) != self.get_bit(input_data, parity_position):
-                # Sum syndrome to find position
-                error_position += parity_position + 1
-
-        match hamming_type:
-
-            # Normal Hamming
-            case "trad":
-                # Flip bit
-                if error_position != 0:
-                    print("bit flip detected & corrected")
-                    error_bit_value = self.get_bit(input_data, error_position - 1)
-                    self.set_bit(input_data, error_position - 1, error_bit_value ^ 1)
-
-            # Extended Hamming
-            case "extnd":
-                # Calculates parity bit of received data
-                parity_calc = self.calc_extnd_parity(input_data)
-                parity_rx = self.get_bit(input_data, self.total_packet_length)
-
-                if parity_calc != parity_rx:
-                    if error_position != 0:
-                        print("bit flip detected & corrected")
-                        error_bit_value = self.get_bit(input_data, error_position - 1)
-                        self.set_bit(input_data, error_position - 1, error_bit_value ^ 1)
-                    else:
-                        # Flip extended parity bit...
-                        print("Extended Parity bit error")
-                else:
-                    if error_position != 0:
-                        print("double bit flip detected, cannot correct")
-                    else:
-                        print("no errors")
-
-
-        return input_data
-
-    def extract(self, input_data):
-        lst = [0] * (self.input_data_length // 8)
-        lst_bit_idx = 0
-        for total_data_idx in sorted(self.data_idx):
-            bit = self.get_bit(input_data, total_data_idx)
-            self.set_bit(lst, lst_bit_idx, bit)
-            lst_bit_idx += 1
-        return lst'''
 
 
 

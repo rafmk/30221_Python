@@ -17,7 +17,7 @@ class DataGenerator:
 
             case 'percentage':
                 # error rate is given in percentage
-                error_rate = round(error_rate / 100 * self.data_size * self.base)
+                error_rate = round(error_rate / 100 * self.data_size * 8)
 
 
         rng = np.random.default_rng(seed)  # seed for generating error positions

@@ -18,6 +18,20 @@ def parity(DG, clean, error_rate_type, error_rate, seed):
     return detected_errors
 
 
+def checksum(DG, clean, error_rate_type, error_rate, seed):
+    # instance of checksum8 class
+    checksum8 = Checksum(clean)
+
+    # calculate checksum and assign to message
+    checksum8.calc_checksum(checksum8.message)
+
+    # modify message and insert errors
+    DG.generate_errors(checksum8.message, error_rate_type, error_rate, seed)
+
+    # returns True if mismatched (error detected)
+    return checksum8.calc_checksum(checksum8.message)
+
+
 def fletcher(DG, clean, error_rate_type, error_rate, seed):
 
     # Instance of fletcher class
@@ -74,6 +88,36 @@ def crc8(polynomial, DG, clean, error_rate_type, error_rate, seed):
     # Returns true based on a detected error, crc.verify returns the inverse: false == error hence, the "not"
     return not crc8_instance.verify(bytes(message_bytes[1:]), message_bytes[0])
 
+def crc16(polynomial, DG, clean, error_rate_type, error_rate, seed):
+
+    # Setup instance with desired settings
+    crc_config = crc.Configuration(
+        width=16,
+        polynomial=polynomial,
+        init_value=0x00,
+        final_xor_value=0x00,
+        reverse_input=False,
+        reverse_output=False
+    )
+    crc16_instance = crc.Calculator(crc_config)
+
+    # Calculate crc8 word from bytes
+    crc_word = crc16_instance.checksum(bytes(clean))
+
+    # Combine crc word + bytes and convert to bits
+    crc_bytes = np.frombuffer(np.uint16(crc_word).tobytes(), dtype=np.uint8)
+    message_bytes = np.concatenate((crc_bytes, clean))
+    message_bits = np.unpackbits(message_bytes, bitorder="little")
+
+    # Generate errors and convert back to bytes
+    DG.generate_errors(message_bits, error_rate_type, error_rate, seed)
+    message_bytes = np.packbits(message_bits, bitorder="little")
+
+    # Extract the first 2 bytes as the received checksum
+    received_crc = np.frombuffer(message_bytes[:2].tobytes(), dtype=np.uint16)[0]
+
+    # Returns true based on a detected error, crc.verify returns the inverse: false == error hence, the "not"
+    return not crc16_instance.verify(bytes(message_bytes[2:]), received_crc)
 
 def rs(DG, clean, error_rate_type, error_rate, seed):
     rsc = RSCodec(4)
