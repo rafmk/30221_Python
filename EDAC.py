@@ -1,6 +1,6 @@
 ### Library for EDAC protocols that I couldn't find already available ###
 import copy
-import numpy as np
+from data_generator import np
 from math import ceil
 from functools import reduce
 import operator as op
@@ -92,6 +92,7 @@ class Hamming:
 
     def decode(self, message):
         error_count = 0
+        correction_count = 0
 
         for block in range(self.blocks):
             block_start = block * self.block_size
@@ -105,11 +106,13 @@ class Hamming:
                     # fix error
                     message[block_start + error_position] = not message[block_start + error_position]
                     error_count += 1
+                    correction_count += 1
 
                 # error in parity bit
                 else:
                     message[block_start] = not message[block_start]
                     error_count += 1
+                    correction_count += 1
 
             # if extended parity check ok, even number of errors detected
             else:
@@ -122,7 +125,7 @@ class Hamming:
                 else:
                     pass
 
-        return error_count
+        return error_count, correction_count
 
     def calc_parity(self, message):
         # calculate Hamming parity bits

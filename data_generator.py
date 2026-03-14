@@ -21,8 +21,8 @@ class DataGenerator:
 
 
         rng = np.random.default_rng(seed)  # seed for generating error positions
-        error_positions = rng.integers(0, len(input_data), size=error_rate)  # generate positions of bit flips
-        input_data[error_positions] ^= 1  # flip bits
+        error_positions = rng.integers(0, len(input_data), size=error_rate, dtype=np.uint8)  # generate positions of bit flips
+        input_data[error_positions] ^= True  # flip bits
 
 
 

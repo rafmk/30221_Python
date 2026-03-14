@@ -1,43 +1,7 @@
-from matplotlib import pyplot as plt
-from data_generator import DataGenerator
 from EDAC import *
 from FletcherChecksumLib import FletcherChecksumBytes
 import crc
 from reedsolo import RSCodec
-
-
-class Test:
-    def __init__(self, rounds, error_rate_type):
-        self.rounds = rounds
-        self.error_rate_type = error_rate_type
-
-        # # of detections for simulation
-        self.det_parity = 0
-        self.det_fletcher = 0
-        self.det_crc8 = 0
-        self.det_rs = 0
-        self.det_bhc = 0
-
-        # # of corrections for simulation
-        self.cor_hm = 0
-        self.cor_rs = 0
-
-
-    def sim(self, error_rate):
-
-        for rnd in range(self.rounds):
-            # Just set seed for error generation identical for all EDAC methods
-            error_seed = rnd
-
-            # Setup random data
-            DG = DataGenerator(18)
-            clean = DG.generate_clean()
-
-            # count up positive detections for each method
-            self.det_parity += parity(DG, clean, self.error_rate_type, error_rate, error_seed)
-            self.det_fletcher += fletcher(DG, clean, self.error_rate_type, error_rate, error_seed)
-            self.det_crc8 += crc8(DG, clean, self.error_rate_type, error_rate, error_seed)
-
 
 def parity(DG, clean, error_rate_type, error_rate, seed):
 
@@ -83,12 +47,12 @@ def fletcher(DG, clean, error_rate_type, error_rate, seed):
     return fletcher_rx_h != fletcher_tx_h or fletcher_tx_l != fletcher_rx_l
 
 
-def crc8(DG, clean, error_rate_type, error_rate, seed):
+def crc8(polynomial, DG, clean, error_rate_type, error_rate, seed):
 
     # Setup instance with desired settings
     crc_config = crc.Configuration(
         width=8,
-        polynomial=0xA6,
+        polynomial=polynomial,
         init_value=0x00,
         final_xor_value=0x00,
         reverse_input=False,

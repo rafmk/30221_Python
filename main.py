@@ -1,128 +1,170 @@
-from testing import *
-# just keeping this for later print(format(byte, '08b'))
 
-'''rounds = 100
-error_rates = np.arange(0, 100, 1)
-parity = np.zeros(len(error_rates))
-crc8 = np.zeros(len(error_rates))
-fletcher16 = np.zeros(len(error_rates))
-for error_rate in error_rates:
-    sim = Test(rounds, 'bits')
-    sim.sim_inst(error_rate)
-    parity[error_rate] = sim.det_parity / rounds
-    crc8[error_rate] = sim.det_crc8 / rounds
-    fletcher16[error_rate] = sim.det_fletcher / rounds
+import matplotlib.pyplot as plt
+from EDAC import *
+from data_generator import DataGenerator
+from testing import parity, fletcher, crc8, rs, hamming
+from tqdm import tqdm
 
-plt.plot(error_rates, parity, 'o-', linewidth=2, markersize=8, label='parity')
-plt.plot(error_rates, crc8, 's-', linewidth=2, markersize=8, label='crc8')
-plt.plot(error_rates, fletcher16, '^-', linewidth=2, markersize=8, label='fletcher16')
 
-plt.xlabel('Error Rate (%)')
-plt.ylabel(f'Number of Errors Detected after {rounds} rounds')
-plt.title('EDAC Method Performance Across Error Rates')
+
+class Test:
+    def __init__(self, nr_of_bytes, rounds, error_rate_type):
+        self.nr_of_bytes = nr_of_bytes
+        self.rounds = rounds
+        self.error_rate_type = error_rate_type
+
+        # Initialize all counters to zero
+        self.reset_counters()
+
+        # initialize clean data
+        self.data_generator = DataGenerator(self.nr_of_bytes)
+        self.clean = self.data_generator.generate_clean()
+
+    def reset_counters(self):
+        """Reset all counters for a new simulation run"""
+        # Detection counters
+        self.det_parity = 0
+        self.det_fletcher = 0
+        self.det_crc8 = 0
+        self.det_crc16 = 0
+        self.det_hm_32_26 = 0
+        self.det_hm_16_11 = 0
+        self.det_hm_8_4 = 0
+        self.det_rs = 0
+
+        # Correction counters
+        self.cor_hm_32_26 = 0
+        self.cor_hm_16_11 = 0
+        self.cor_hm_8_4 = 0
+        self.cor_hm_4_3 = 0
+        self.cor_rs = 0
+
+        # Total errors injected (for detection rate calculation)
+        self.total_errors_injected = 0
+
+    def sim_rounds(self, error_rate):
+        # runs simulation across nr of specified rounds at fixed error_rate
+
+        results = {
+            'parity': {'detection': [], 'correction': []},
+            'fletcher16': {'detection': [], 'correction': []},
+            'crc8': {'detection': [], 'correction': []},
+            'hamming_32_26': {'detection': [], 'correction': []},
+        }
+
+        for rnd in tqdm(range(self.rounds), desc=f"Error rate {error_rate}"):
+            seed_rnd = rnd  # use the same seed for error generation across all EDAC methods
+
+            # parity
+            self.det_parity = parity(self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd)
+            results['parity']['detection'].append(self.det_parity)
+
+            # checksum8
+
+            # fletcher16
+            self.det_fletcher = fletcher(self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd)
+            results['fletcher16']['detection'].append(int(self.det_fletcher))
+
+            # crc8
+            self.det_crc8 = (
+                crc8(0xA6, self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd))
+            results['crc8']['detection'].append(int(self.det_crc8))
+
+            # crc16
+
+            # hamming (32,26)
+            self.det_hm_32_26, self.cor_hm_32_26 = (
+                hamming(5, self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd))
+            results['hamming_32_26']['detection'].append(self.det_hm_32_26)
+            results['hamming_32_26']['correction'].append(self.cor_hm_32_26)
+
+            # rs(2)
+
+        return results
+
+
+    def run_simulation(self, error_rates):
+        # Runs simulation across different error rates
+        results = {}
+
+        for error_rate in error_rates:
+            results[error_rate] = {}
+
+            # simulate rounds
+            rounds_results = self.sim_rounds(error_rate)
+
+            # compile results
+            for key, value in rounds_results.items():
+                det_avg = sum(value['detection']) / len(value['detection'])
+                det_min = min(value['detection'])
+                det_max = max(value['detection'])
+
+                #cor_avg = sum(value['correction']) / len(value['correction'])
+                #cor_min = min(value['correction'])
+                #cor_max = max(value['correction'])
+                #results[error_rate][key] = [det_avg, det_min, det_max, cor_avg, cor_min, cor_max]
+                results[error_rate][key] = [det_avg, det_min, det_max]
+
+
+
+            # reset counters for round simulations
+            self.reset_counters()
+
+        return results
+
+# Test parameters
+nr_of_bytes = 18  # Bytes per round
+rounds = 1000  # Number of rounds per error rate
+error_rate_type = 'bits'  # Type of errors
+
+# Error rates to test
+error_rates = [10, 20, 30]
+
+# Create test instance
+tester = Test(nr_of_bytes, rounds, error_rate_type)
+simulation_results = tester.run_simulation(error_rates)
+
+methods = list(next(iter(simulation_results.values())).keys())
+error_rates = list(simulation_results.keys())
+
+x = np.arange(len(error_rates))
+width = 0.18
+
+plt.figure(figsize=(12,6))
+
+for i, method in enumerate(methods):
+
+    avg = [simulation_results[er][method][0] for er in error_rates]
+    minv = [simulation_results[er][method][1] for er in error_rates]
+    maxv = [simulation_results[er][method][2] for er in error_rates]
+
+    pos = x + i * width
+
+    plt.bar(pos, avg, width, label=method)
+    plt.scatter(pos, minv, color="black", marker="_", s=200)
+    plt.scatter(pos, maxv, color="black", marker="_", s=200)
+
+plt.xticks(x + width*(len(methods)-1)/2, error_rates)
+plt.xlabel("Error Rate")
+plt.ylabel("Detected Errors (bits)")
+plt.title("EDAC Detection Performance")
+
 plt.legend()
-plt.grid(True, alpha=0.3)
-plt.show()'''
+plt.grid(axis="y", linestyle="--", alpha=0.6)
 
-
-input_data = np.arange(18, dtype=np.uint8)
-print(input_data)
-hm = Hamming(input_data, 5)
-hm.encode()
-hm.decode(hm.message)
-print(hm.convert(hm.message))
-#hm = Hamming([0b00001110], 3)
-#hm.encode(hamming_type="extnd")
-#print(" ".join(f"{byte:08b}" for byte in hm.total_packet))
-#print(hm.extract(hm.total_packet))
-#error = 0b10111111
-#print([format(i, '08b') for i in [error]])
-#print([format(i, '08b') for i in hm.decode([error], hamming_type="extnd")])
+plt.tight_layout()
+plt.show()
 
 
 
 
 
-'''### Generate data ###
-
-# Setup data generator, set error rate
-DG = DataGenerator(18)
-error_rate = 50  # %
-print("@ 50% error rate 50% of bits in the complete message will experience a flip")
-
-# Grab clean data
-clean = DG.generate_clean()
-
-###UART Parity clone###
-
-# Grab parity bytes
-parity_bytes = np.array(Parity(clean).parity_calc(), dtype=np.uint8)
-
-# Combine clean + parity bytes & feed to error generator
-clean_plus_p = np.append(clean, parity_bytes)
-#print(clean_plus_p)
-DG.generate_errors(clean_plus_p, error_rate)
-#print(DG.dirty)
-
-# Grab dirty array and feed to Parity calc
-PD = Parity(clean_plus_p)
-PD.check_parity(len(parity_bytes))
-print("Parity error detection: ", PD.error_detection, "errors detected")
 
 
-###Fletcher###
-
-# Setup instance
-FL = FletcherChecksumBytes
-
-# Calculate fletcher 16 for clean data
-fl_clean = FL.get_fletcher16(bytes(clean))
-fl_h = (fl_clean['Fletcher16_dec'] >> 8) & 0xff
-fl_l = fl_clean['Fletcher16_dec'] & 0xff
-
-# Combine clean + parity bytes & feed to error generator
-clean_plus_fl = np.append(clean, np.array([fl_h, fl_l], dtype=np.uint8))
 
 
-# Generate errors
-DG.generate_errors(clean_plus_fl, error_rate)
-# Possibly erroneous fletcher16 values
-fl_h_tx, fl_l_tx = clean_plus_fl[-2:]
-
-# Calculate fletcher16 values for incoming data and check against sent values
-fl_dirty = FL.get_fletcher16(bytes(clean_plus_fl[:-2]))
-fl_h_rx = (fl_dirty['Fletcher16_dec'] >> 8) & 0xff
-fl_l_rx = fl_dirty['Fletcher16_dec'] & 0xff
-
-if fl_h_tx != fl_h_rx or fl_l_tx != fl_l_rx:
-    print("Fletcher error detection: ", "error detected")
 
 
-#CRC
-
-# Setup instance with desired settings
-crc_config = crc.Configuration(
-    width=8,
-    polynomial=0xA6,
-    init_value=0x00,
-    final_xor_value=0x00,
-    reverse_input=False,
-    reverse_output=False
-)
-CRC = crc.Calculator(crc_config)
-
-# Calculate crc value
-crc_word = CRC.checksum(bytes(clean))
-
-# Combine clean + crc word & feed to error generator
-clean_plus_crc = np.append(clean, np.uint8(crc_word))
-
-# Generate errors
-DG.generate_errors(clean_plus_crc, error_rate)
-
-# Check for errors
-if not CRC.verify(bytes(clean_plus_crc[:-1]), clean_plus_crc[-1]):
-    print("CRC8 error detection: ", "error detected")'''
 
 
 
