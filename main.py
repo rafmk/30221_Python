@@ -40,8 +40,6 @@ class Test:
         self.cor_hm_4_3 = 0
         self.cor_rs = 0
 
-        # Total errors injected (for detection rate calculation)
-        self.total_errors_injected = 0
 
     def sim_rounds(self, error_rate):
         # runs simulation across nr of specified rounds at fixed error_rate
@@ -52,7 +50,8 @@ class Test:
             'fletcher16': {'detection': [], 'correction': []},
             'crc8': {'detection': [], 'correction': []},
             'crc16': {'detection': [], 'correction': []},
-            'hamming_32_26': {'detection': [], 'correction': []},
+            'hamming_8_4': {'detection': [], 'correction': []},
+            'hamming_32_26': {'detection': [], 'correction': []}
         }
 
         for rnd in tqdm(range(self.rounds), desc=f"Error rate {error_rate}"):
@@ -80,6 +79,12 @@ class Test:
                 crc16(0xAC9A, self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd))
             results['crc16']['detection'].append(int(self.det_crc16))
 
+            # hamming (8, 4)
+            self.det_hm_8_4, self.cor_hm_8_4 = (
+                hamming(3, self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd))
+            results['hamming_8_4']['detection'].append(self.det_hm_8_4)
+            results['hamming_8_4']['correction'].append(self.cor_hm_8_4)
+
             # hamming (32,26)
             self.det_hm_32_26, self.cor_hm_32_26 = (
                 hamming(5, self.data_generator, self.clean, self.error_rate_type, error_rate, seed_rnd))
@@ -106,14 +111,13 @@ class Test:
                 det_avg = sum(value['detection']) / len(value['detection'])
                 det_min = min(value['detection'])
                 det_max = max(value['detection'])
+                # std deviation, confidence interval, standard error
 
                 #cor_avg = sum(value['correction']) / len(value['correction'])
                 #cor_min = min(value['correction'])
                 #cor_max = max(value['correction'])
                 #results[error_rate][key] = [det_avg, det_min, det_max, cor_avg, cor_min, cor_max]
                 results[error_rate][key] = [det_avg, det_min, det_max]
-
-
 
             # reset counters for round simulations
             self.reset_counters()
@@ -125,7 +129,7 @@ class Test:
 
 # Test parameters
 nr_of_bytes = 18  # Bytes per round
-rounds = 100  # Number of rounds per error rate
+rounds = 1000  # Number of rounds per error rate
 error_rate_type = 'bits'  # Type of errors
 
 # Error rates to test
@@ -177,6 +181,7 @@ def plot_ordered_simulation_results(simulation_results):
         ax.bar(x + offset, avgs, bar_width, label=method,
                yerr=yerr, capsize=4, color=colors[i], edgecolor='gray', linewidth=0.5)
 
+
     # 5. Finalize Chart Labels
     ax.set_xlabel(f'Error Rate ({error_rate_type})')
     ax.set_ylabel('Detections \n (for checksums 1 indicates a detection across the entire message)')
@@ -187,7 +192,7 @@ def plot_ordered_simulation_results(simulation_results):
     # 6. Indication of error bar meaning
     # Placing a text box in the upper right
     explanation_text = "Error bars represent\nMinimum and Maximum\ndetections per round."
-    ax.text(0.02, 0.75, explanation_text, transform=ax.transAxes,
+    ax.text(0.02, 0.6, explanation_text, transform=ax.transAxes,
             verticalalignment='top', horizontalalignment='left',
             bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.5, edgecolor='gray'))
 

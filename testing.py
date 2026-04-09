@@ -121,11 +121,10 @@ def crc16(polynomial, DG, clean, error_rate_type, error_rate, seed):
 
 def rs(DG, clean, error_rate_type, error_rate, seed):
     rsc = RSCodec(4)
-    print(clean)
     clean_plus_rs = np.array(rsc.encode(clean))
-    print(clean_plus_rs)
+
     DG.generate_errors(clean_plus_rs, error_rate_type, error_rate, seed)
-    print(clean_plus_rs)
+
     print(np.array(rsc.decode(clean_plus_rs)[0]))
     return
 

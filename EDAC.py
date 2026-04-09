@@ -55,7 +55,7 @@ class Checksum:
 
     def calc_checksum(self, message):
         # save old checksum
-        old_chksm = np.packbits(message[:8], bitorder="little")
+        old_chksm = np.packbits(message[:8], bitorder="little")[0]
         # calc checksum while avoiding checksum bits themselves
         chksm = np.sum(message[8:])
         # assign new checksum to message start
