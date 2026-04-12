@@ -153,10 +153,8 @@ class Hamming:
             block_end = block_start + self.block_size
 
             error_position = reduce(op.xor, [i for i, bit in enumerate(message[block_start:block_end]) if bit], 0)
-            for i in range(error_position.bit_length()):
-                if error_position >> i & 1:
-                    # flip parity bit in message
-                    message[block_start + (2 ** i)] = not message[block_start + (2 ** i)]
+            for i in range(self.r):
+                message[block_start + (1 << i)] = (error_position >> i) & 1
 
             # calculated extended parity
             message[block_start] = message[block_start: block_end].sum() % 2

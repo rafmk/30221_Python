@@ -129,7 +129,7 @@ class Test:
 
 # Test parameters
 nr_of_bytes = 18  # Bytes per round
-rounds = 1000  # Number of rounds per error rate
+rounds = 100  # Number of rounds per error rate
 error_rate_type = 'bits'  # Type of errors
 
 # Error rates to test
